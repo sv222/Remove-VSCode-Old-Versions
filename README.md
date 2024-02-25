@@ -27,6 +27,7 @@ This Python script helps you identify and manage duplicate extensions within you
     python main.py "C:\Users\<USERNAME>\.vscode\extensions"  # Replace with your actual path to your VS Code extensions directory.
     ```
 4. **Follow the prompts to view the report and choose whether to remove duplicates.**
+5. **Your old extensions will be moved to the "old_versions" folder in the same directory as the script.**
 
 ## Key Features
 
