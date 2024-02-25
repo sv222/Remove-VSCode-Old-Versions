@@ -16,7 +16,7 @@ This Python script helps you identify and manage duplicate extensions within you
 
 1. **Clone this repository:**
     ```bash
-    git clone https://sv222.github.io/RemoveVSCodeOldVersions && cd RemoveVSCodeOldVersions
+    git clone https://github.com/sv222/RemoveVSCodeOldVersions && cd RemoveVSCodeOldVersions
     ```
 2. **Install dependencies:**
     ```bash
