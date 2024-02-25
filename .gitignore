@@ -1,0 +1,89 @@
+# Environment variables and secrets
+*.env
+*.secrets
+
+# Virtual environments
+venv/
+.venv/
+.env/
+
+# Build and distribution artifacts
+build/
+dist/
+eggs/
+lib/
+bin/
+share/
+*.egg-info/
+*.egg
+MANIFEST
+
+# IDE/editor configurations
+.idea/
+.vscode/
+pycharm/
+
+# Version control system metadata
+.git/
+.hg/
+.svn/
+
+# Temporary files and logs
+*.pyc
+*.pyo
+*.log
+tmp/
+*.tmp
+
+# Test and coverage reports
+.tox/
+.nox/
+.coverage
+nosetests.xml
+coverage.xml
+
+# Documentation build output
+docs/_build/
+
+# Jupyter Notebooks and checkpoints
+*.ipynb
+.ipynb_checkpoints/
+
+# IDE project files
+.project
+.pydevproject
+
+# IDE/editor backup files
+*.swp
+*.swo
+
+# Local settings for frameworks
+# (e.g., Django: local_settings.py, Flask: instance/)
+
+# Platform-specific files
+Thumbs.db
+DS_Store
+
+# Operating system temp/cache files
+tmp/
+*.cache/
+
+# IDE/editor caches
+*.cache/pycharm/
+
+# PyInstaller logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Poetry/Pdm lock files
+poetry.lock
+pdm.lock
+
+# Specific linters/formatters ignore files
+.flake8
+.blackignore
+
+# IDE/editor project-specific ignore files
+.idea/
+.vscode/
+/qodana.yaml
