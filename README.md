@@ -21,13 +21,13 @@ This Python script helps you identify and manage duplicate extensions within you
     git clone https://github.com/sv222/RemoveVSCodeOldVersions && cd RemoveVSCodeOldVersions
     ```
 
-2.  **Create a virtual environment (recommended):**
+2.  **Create a virtual environment (recommended) and import dependencies:**
 
     *   Using `conda`:
 
         ```bash
-        conda create -n remove_vscode_ext python=3.13
-        conda activate remove_vscode_ext
+        conda env create -f environment.yml # Create the environment
+        conda activate removeVSExtDuplicates # Activate the environment
         ```
 
     *   Using `venv`:
@@ -39,26 +39,31 @@ This Python script helps you identify and manage duplicate extensions within you
         source .venv/bin/activate # On Linux/macOS
         ```
 
-3.  **Install dependencies:**
+    *   Install dependencies using `pip`:
 
-    ```bash
-    pip install -r requirements.txt
-    ```
+        ```bash
+        pip install -r requirements.txt
+        ```
 
-4.  **Run the script:**
+3.  **Run the script:**
 
     ```bash
     python main.py "C:\Users\<USERNAME>\.vscode\extensions"  # Replace <USERNAME> with your actual Windows username.
     # or
     python main.py "/Users/<USERNAME>/.vscode/extensions" # Replace <USERNAME> with your actual macOS username.
     ```
+    *   To run script without user interaction and automatically remove duplicates, use `--auto-approve` flag:
+
+    ```bash
+    python main.py "C:\Users\<USERNAME>\.vscode\extensions" --auto-approve
+    ```
 
     *   Verify the path to your VS Code extensions directory. The path might vary slightly depending on your operating system and VS Code installation.
     *   Run the script periodically to keep your extensions directory clean.
 
-5.  **Follow the prompts:** The script will display a report of duplicate extensions. You will be prompted to choose whether to remove the old duplicates.
+4.  **Follow the prompts:** The script will display a report of duplicate extensions. You will be prompted to choose whether to remove the old duplicates.
 
-6.  **Old versions moved:** Your old extensions will be moved to the "old\_versions" folder in the same directory as the script.
+5.  **Old versions moved:** Your old extensions will be moved to the "old\_versions" folder in the same directory as the script.
 
 ## How it Works
 
