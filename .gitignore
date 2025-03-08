@@ -87,3 +87,7 @@ pdm.lock
 .idea/
 .vscode/
 /qodana.yaml
+
+# all removed extensions
+
+old_versions
