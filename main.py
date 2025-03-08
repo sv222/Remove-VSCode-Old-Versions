@@ -89,7 +89,7 @@ def show_report(duplicate_extensions, latest_versions):
             print(f"* {name} (Latest version: {latest_version} - no older duplicates)")
 
 
-def remove_duplicates(duplicate_extensions, latest_versions, extensions_path):
+def remove_duplicates(duplicate_extensions, latest_versions, extensions_path, args):
     """
     Function to remove old duplicates of extensions.
 
@@ -98,8 +98,8 @@ def remove_duplicates(duplicate_extensions, latest_versions, extensions_path):
         latest_versions (dict): Dictionary of latest versions for duplicates.
         extensions_path (str): Path to the extensions directory.
     """
-    action_for_duplicates = input("Remove old duplicates? (yes/no): ").lower() == "yes"
-    if action_for_duplicates:
+    action_for_duplicates = not args.auto_approve and input("Remove old duplicates? (yes/no): ").lower() == "yes"
+    if args.auto_approve or action_for_duplicates:
         old_versions_dir = "old_versions"
         os.makedirs(old_versions_dir, exist_ok=True)
         for name, versions in duplicate_extensions.items():
@@ -132,6 +132,9 @@ def main():
     parser.add_argument(
         "extensions_path", type=str, help="Path to the directory containing extensions"
     )
+    parser.add_argument(
+        "--auto-approve", action="store_true", help="Automatically approve removal of duplicates"
+    )
     args = parser.parse_args()
 
     extensions_path = args.extensions_path  # Using the argument as the path
@@ -139,7 +142,7 @@ def main():
     duplicate_extensions = find_duplicates(extension_data)
     latest_versions = get_latest_versions(duplicate_extensions)
     show_report(duplicate_extensions, latest_versions)
-    remove_duplicates(duplicate_extensions, latest_versions, extensions_path)
+    remove_duplicates(duplicate_extensions, latest_versions, extensions_path, args)
 
 
 if __name__ == "__main__":
