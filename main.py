@@ -1,7 +1,7 @@
 import argparse  # Importing the argparse library for command line arguments
 import os  # Importing the os library for interacting with the operating system
 import semver  # Importing the semver library for parsing semantic version strings
-
+import shutil # Importing shutil for moving files
 
 def get_extension_data(extensions_path):
     """
@@ -14,19 +14,19 @@ def get_extension_data(extensions_path):
         dict: A dictionary containing extension names as keys and lists of semantic versions as values.
     """
     extension_data = {}
-    for extension in os.listdir(extensions_path):  # Iterate through each file/directory in the extensions directory
-        extension_path = os.path.join(extensions_path, extension)  # Create full path to the extension
-        if os.path.isdir(extension_path):  # Check if the current item is a directory
+    for extension in os.listdir(extensions_path):
+        extension_path = os.path.join(extensions_path, extension)
+        if os.path.isdir(extension_path):
             try:
-                name, version = extension.rsplit("-",
-                                                 1)  # Split the filename at the last "-" to separate name and version
-                version = semver.VersionInfo.parse(version)  # Parse the version string as semantic version
-                extension_data.setdefault(name, []).append(
-                    version)  # Store the version in the dictionary under the extension name
+                name, version_str = extension.rsplit("-", 1)
+                version = semver.VersionInfo.parse(version_str)
+                extension_data.setdefault(name, []).append(version)
             except ValueError as e:
-                print(f"Error parsing version for {extension}: {e}. Skipping.")
+                print(f"ValueError parsing version for extension '{extension}': {e}. Skipping.")
             except AttributeError:
-                print(f"Error parsing version for {extension}: Invalid format. Skipping.")
+                print(f"AttributeError parsing version for extension '{extension}'. Invalid format. Skipping.")
+            except Exception as e:
+                print(f"Unexpected error processing extension '{extension}': {e}. Skipping.")
     return extension_data
 
 
@@ -57,20 +57,23 @@ def get_latest_versions(duplicate_extensions):
     latest_versions = {name: max(versions) for name, versions in duplicate_extensions.items()}
     return latest_versions
 
-
 def show_report(duplicate_extensions, latest_versions):
     """
     Function to display a report on duplicate extensions and their versions.
 
     Args:
-        duplicate_extensions (dict): A dictionary containing duplicate extension names as keys and their versions as values.
-        latest_versions (dict): A dictionary containing duplicate extension names as keys and their latest versions as values.
+        duplicate_extensions (dict): Dictionary of duplicate extensions.
+        latest_versions (dict): Dictionary of latest versions.
     """
-    print("Duplicate extensions (excluding latest versions):")
+    print("Duplicate extensions Report:")
     for name, versions in duplicate_extensions.items():
-        old_versions = [v for v in versions if v != latest_versions[name]]
+        latest_version = latest_versions[name]
+        old_versions = [v for v in versions if v != latest_version]
         if old_versions:
-            print(f"* {name} ({', '.join(str(v) for v in old_versions)})")
+            print(f"* {name} (Latest: {latest_version}, Old: {', '.join(str(v) for v in old_versions)})")
+        else:
+            print(f"* {name} (Latest version: {latest_version} - no older duplicates)")
+
 
 
 def remove_duplicates(duplicate_extensions, latest_versions, extensions_path):
@@ -78,20 +81,25 @@ def remove_duplicates(duplicate_extensions, latest_versions, extensions_path):
     Function to remove old duplicates of extensions.
 
     Args:
-        duplicate_extensions (dict): A dictionary containing duplicate extension names as keys and their versions as values.
-        latest_versions (dict): A dictionary containing duplicate extension names as keys and their latest versions as values.
-        extensions_path (str): Path to the directory containing extensions.
+        duplicate_extensions (dict): Dictionary of duplicate extensions.
+        latest_versions (dict): Dictionary of latest versions for duplicates.
+        extensions_path (str): Path to the extensions directory.
     """
     action_for_duplicates = input("Remove old duplicates? (yes/no): ").lower() == "yes"
     if action_for_duplicates:
-        os.makedirs("old_versions", exist_ok=True)
+        old_versions_dir = "old_versions"
+        os.makedirs(old_versions_dir, exist_ok=True)
         for name, versions in duplicate_extensions.items():
+            latest_version = latest_versions[name]
             for version in versions:
-                if version != latest_versions[name]:
+                if version != latest_version:
                     old_extension_path = os.path.join(extensions_path, f"{name}-{version}")
-                    new_extension_path = os.path.join("old_versions", f"{name}-{version}")
-                    os.renames(old_extension_path, new_extension_path)
-                    print(f"Moved {old_extension_path} to {new_extension_path}")
+                    new_extension_path = os.path.join(old_versions_dir, f"{name}-{version}")
+                    try:
+                        shutil.move(old_extension_path, new_extension_path)
+                        print(f"Moved '{old_extension_path}' to '{new_extension_path}'")
+                    except Exception as e:
+                        print(f"Error moving '{old_extension_path}' to '{new_extension_path}': {e}")
     else:
         print("No duplicates removed.")
 
