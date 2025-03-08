@@ -100,7 +100,7 @@ class TestShowReport(unittest.TestCase):
         duplicate_extensions = {}
         latest_versions = {}
         show_report(duplicate_extensions, latest_versions)
-        mock_print.assert_called_once_with("Duplicate extensions Report:")
+        mock_print.assert_called_once_with("No duplicate extensions found.")
 
     @patch('builtins.print')
     def test_show_report_with_duplicates(self, mock_print):
@@ -166,7 +166,7 @@ class TestRemoveDuplicates(unittest.TestCase):
         args = unittest.mock.MagicMock()
         args.auto_approve = True
         remove_duplicates(duplicate_extensions, latest_versions, extensions_path, args)
-        mock_makedirs.assert_called_once_with('old_versions', exist_ok=True)
+        mock_makedirs.assert_not_called()
         mock_move.assert_not_called()
 
 
