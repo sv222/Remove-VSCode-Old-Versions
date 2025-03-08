@@ -1,7 +1,8 @@
 import argparse  # Importing the argparse library for command line arguments
 import os  # Importing the os library for interacting with the operating system
 import semver  # Importing the semver library for parsing semantic version strings
-import shutil # Importing shutil for moving files
+import shutil  # Importing shutil for moving files
+
 
 def get_extension_data(extensions_path):
     """
@@ -22,11 +23,17 @@ def get_extension_data(extensions_path):
                 version = semver.VersionInfo.parse(version_str)
                 extension_data.setdefault(name, []).append(version)
             except ValueError as e:
-                print(f"ValueError parsing version for extension '{extension}': {e}. Skipping.")
+                print(
+                    f"ValueError parsing version for extension '{extension}': {e}. Skipping."
+                )
             except AttributeError:
-                print(f"AttributeError parsing version for extension '{extension}'. Invalid format. Skipping.")
+                print(
+                    f"AttributeError parsing version for extension '{extension}'. Invalid format. Skipping."
+                )
             except Exception as e:
-                print(f"Unexpected error processing extension '{extension}': {e}. Skipping.")
+                print(
+                    f"Unexpected error processing extension '{extension}': {e}. Skipping."
+                )
     return extension_data
 
 
@@ -40,7 +47,9 @@ def find_duplicates(extension_data):
     Returns:
         dict: A dictionary containing duplicate extension names as keys and their versions as values.
     """
-    duplicate_extensions = {name: versions for name, versions in extension_data.items() if len(versions) > 1}
+    duplicate_extensions = {
+        name: versions for name, versions in extension_data.items() if len(versions) > 1
+    }
     return duplicate_extensions
 
 
@@ -54,8 +63,11 @@ def get_latest_versions(duplicate_extensions):
     Returns:
         dict: A dictionary containing duplicate extension names as keys and their latest versions as values.
     """
-    latest_versions = {name: max(versions) for name, versions in duplicate_extensions.items()}
+    latest_versions = {
+        name: max(versions) for name, versions in duplicate_extensions.items()
+    }
     return latest_versions
+
 
 def show_report(duplicate_extensions, latest_versions):
     """
@@ -70,10 +82,11 @@ def show_report(duplicate_extensions, latest_versions):
         latest_version = latest_versions[name]
         old_versions = [v for v in versions if v != latest_version]
         if old_versions:
-            print(f"* {name} (Latest: {latest_version}, Old: {', '.join(str(v) for v in old_versions)})")
+            print(
+                f"* {name} (Latest: {latest_version}, Old: {', '.join(str(v) for v in old_versions)})"
+            )
         else:
             print(f"* {name} (Latest version: {latest_version} - no older duplicates)")
-
 
 
 def remove_duplicates(duplicate_extensions, latest_versions, extensions_path):
@@ -93,13 +106,19 @@ def remove_duplicates(duplicate_extensions, latest_versions, extensions_path):
             latest_version = latest_versions[name]
             for version in versions:
                 if version != latest_version:
-                    old_extension_path = os.path.join(extensions_path, f"{name}-{version}")
-                    new_extension_path = os.path.join(old_versions_dir, f"{name}-{version}")
+                    old_extension_path = os.path.join(
+                        extensions_path, f"{name}-{version}"
+                    )
+                    new_extension_path = os.path.join(
+                        old_versions_dir, f"{name}-{version}"
+                    )
                     try:
                         shutil.move(old_extension_path, new_extension_path)
                         print(f"Moved '{old_extension_path}' to '{new_extension_path}'")
                     except Exception as e:
-                        print(f"Error moving '{old_extension_path}' to '{new_extension_path}': {e}")
+                        print(
+                            f"Error moving '{old_extension_path}' to '{new_extension_path}': {e}"
+                        )
     else:
         print("No duplicates removed.")
 
@@ -108,9 +127,11 @@ def main():
     """
     Main function to execute the extension management process.
     """
-    
+
     parser = argparse.ArgumentParser(description="Manage duplicate extensions.")
-    parser.add_argument("extensions_path", type=str, help="Path to the directory containing extensions")
+    parser.add_argument(
+        "extensions_path", type=str, help="Path to the directory containing extensions"
+    )
     args = parser.parse_args()
 
     extensions_path = args.extensions_path  # Using the argument as the path
