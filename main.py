@@ -108,7 +108,7 @@ def main():
     """
     Main function to execute the extension management process.
     """
-    # extensions_path = "C:\\Users\\stani\\.vscode\\extensions"
+    
     parser = argparse.ArgumentParser(description="Manage duplicate extensions.")
     parser.add_argument("extensions_path", type=str, help="Path to the directory containing extensions")
     args = parser.parse_args()
