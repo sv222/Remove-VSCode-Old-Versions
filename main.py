@@ -15,25 +15,39 @@ def get_extension_data(extensions_path):
         dict: A dictionary containing extension names as keys and lists of semantic versions as values.
     """
     extension_data = {}
-    for extension in os.listdir(extensions_path):
-        extension_path = os.path.join(extensions_path, extension)
+    for extension_dir in os.listdir(extensions_path):  # Renamed 'extension' to 'extension_dir' for clarity
+        extension_path = os.path.join(extensions_path, extension_dir)
         if os.path.isdir(extension_path):
-            try:
-                name, version_str = extension.rsplit("-", 1)
-                version = semver.VersionInfo.parse(version_str)
-                extension_data.setdefault(name, []).append(version)
-            except ValueError as e:
-                print(
-                    f"ValueError parsing version for extension '{extension}': {e}. Skipping."
-                )
-            except AttributeError:
-                print(
-                    f"AttributeError parsing version for extension '{extension}'. Invalid format. Skipping."
-                )
-            except Exception as e:
-                print(
-                    f"Unexpected error processing extension '{extension}': {e}. Skipping."
-                )
+            name = extension_dir
+            versions = []
+            version_str = None
+            parts = extension_dir.split('-')
+            for i in range(len(parts) - 1, 0, -1):  # Iterate backwards to find version
+                version_str_candidate = '-'.join(parts[i:])
+                name_candidate = '-'.join(parts[:i])
+                try:
+                    semver.VersionInfo.parse(version_str_candidate)
+                    version_str = version_str_candidate
+                    name = name_candidate
+                    break  # Exit loop once valid version is found
+                except ValueError:
+                    continue  # Continue to next iteration if not valid SemVer
+
+            if version_str:
+                try:
+                    version = semver.VersionInfo.parse(version_str)
+                    versions.append(version)
+                except ValueError as e:  # Added specific exception for semver.parse
+                    print(
+                        f"ValueError parsing version for extension '{extension_dir}' with version string '{version_str}': {e}. Using default version 0.0.0."
+                    )
+                    versions.append(semver.VersionInfo.parse("0.0.0"))  # Default version
+            else:
+                print(f"No version found in extension '{extension_dir}'. Using default version 0.0.0.")
+                versions.append(semver.VersionInfo.parse("0.0.0"))  # Default version
+
+            if versions:  # Only add if we got at least one version (default or parsed)
+                extension_data.setdefault(name, []).extend(versions)
     return extension_data
 
 
