@@ -1,174 +1,365 @@
 import unittest
 import os
-from unittest.mock import patch
+import shutil
+from unittest.mock import patch, mock_open
+import argparse
 import semver
-from main import get_extension_data, find_duplicates, get_latest_versions, show_report, remove_duplicates
+from main import (
+    get_extension_data,
+    find_duplicates,
+    get_latest_versions,
+    show_report,
+    remove_duplicates,
+    main,
+)
 
 
 class TestGetExtensionData(unittest.TestCase):
-    @patch('os.listdir')
-    @patch('os.path.isdir')
-    def test_get_extension_data_valid(self, mock_isdir, mock_listdir):
-        mock_listdir.return_value = ['ext1-1.0.0', 'ext2-2.1.0', 'ext3-0.1.0']
-        mock_isdir.return_value = True
+    @patch("os.listdir")
+    @patch("os.path.isdir")
+    def test_get_extension_data_valid_versions(self, mock_isdir, mock_listdir):
+        mock_listdir.return_value = [
+            "my-extension-1.0.0",
+            "another-extension-2.1.1",
+        ]
+        mock_isdir.side_effect = [True, True]
         expected_data = {
-            'ext1': [semver.VersionInfo(1, 0, 0)],
-            'ext2': [semver.VersionInfo(2, 1, 0)],
-            'ext3': [semver.VersionInfo(0, 1, 0)],
+            "my-extension": [semver.VersionInfo(1, 0, 0)],
+            "another-extension": [semver.VersionInfo(2, 1, 1)],
         }
-        self.assertEqual(get_extension_data('/path/to/extensions'), expected_data)
+        result = get_extension_data("extensions_path")
+        self.assertEqual(result, expected_data)
 
-    @patch('os.listdir')
-    @patch('os.path.isdir')
-    def test_get_extension_data_invalid_version(self, mock_isdir, mock_listdir):
-        mock_listdir.return_value = ['ext1-1.0.0', 'ext2-invalid', 'ext3-0.1.0']
-        mock_isdir.return_value = True
+    @patch("os.listdir")
+    @patch("os.path.isdir")
+    def test_get_extension_data_no_versions(self, mock_isdir, mock_listdir):
+        mock_listdir.return_value = ["my-extension", "another-extension"]
+        mock_isdir.side_effect = [True, True]
         expected_data = {
-            'ext1': [semver.VersionInfo(1, 0, 0)],
-            'ext3': [semver.VersionInfo(0, 1, 0)],
+            "my-extension": [],
+            "another-extension": [],
         }
-        self.assertEqual(get_extension_data('/path/to/extensions'), expected_data)
+        result = get_extension_data("extensions_path")
+        self.assertEqual(result, expected_data)
 
-    @patch('os.listdir')
-    @patch('os.path.isdir')
-    def test_get_extension_data_no_extensions(self, mock_isdir, mock_listdir):
+    @patch("os.listdir")
+    @patch("os.path.isdir")
+    def test_get_extension_data_mixed_versions(self, mock_isdir, mock_listdir):
+        mock_listdir.return_value = [
+            "my-extension-1.0.0",
+            "another-extension",
+            "third-extension-0.1.0",
+        ]
+        mock_isdir.side_effect = [True, True, True]
+        expected_data = {
+            "my-extension": [semver.VersionInfo(1, 0, 0)],
+            "another-extension": [],
+            "third-extension": [semver.VersionInfo(0, 1, 0)],
+        }
+        result = get_extension_data("extensions_path")
+        self.assertEqual(result, expected_data)
+
+    @patch("os.listdir")
+    @patch("os.path.isdir")
+    def test_get_extension_data_non_extension_dirs(self, mock_isdir, mock_listdir):
+        mock_listdir.return_value = ["my-extension-1.0.0", "not-an-extension", "another-extension-2.0.0"]
+        mock_isdir.side_effect = [True, True, True]
+        expected_data = {
+            "my-extension": [semver.VersionInfo(1, 0, 0)],
+            "not-an-extension": [],
+            "another-extension": [semver.VersionInfo(2, 0, 0)],
+        }
+        result = get_extension_data("extensions_path")
+        self.assertEqual(result, expected_data)
+
+    @patch("os.listdir")
+    @patch("os.path.isdir")
+    def test_get_extension_data_empty_path(self, mock_isdir, mock_listdir):
         mock_listdir.return_value = []
-        mock_isdir.return_value = True
-        self.assertEqual(get_extension_data('/path/to/extensions'), {})
-
-    @patch('os.listdir')
-    @patch('os.path.isdir')
-    def test_get_extension_data_not_a_directory(self, mock_isdir, mock_listdir):
-        mock_listdir.return_value = ['ext1-1.0.0']
         mock_isdir.return_value = False
-        self.assertEqual(get_extension_data('/path/to/extensions'), {})
+        expected_data = {}
+        result = get_extension_data("extensions_path")
+        self.assertEqual(result, expected_data)
+
+    @patch("os.listdir")
+    @patch("os.path.isdir")
+    def test_get_extension_data_invalid_version_format(self, mock_isdir, mock_listdir):
+        mock_listdir.return_value = ["my-extension-v1.0.0"]
+        mock_isdir.side_effect = [True]
+        expected_data = {"my-extension-v1.0.0": []}
+        result = get_extension_data("extensions_path")
+        self.assertEqual(result, expected_data)
+
+    @patch("os.listdir")
+    @patch("os.path.isdir")
+    def test_get_extension_data_multiple_versions(self, mock_isdir, mock_listdir):
+        mock_listdir.return_value = ["my-extension-1.0.0", "my-extension-1.1.0", "my-extension-1.2.0"]
+        mock_isdir.side_effect = [True, True, True]
+        expected_data = {
+            "my-extension": [
+                semver.VersionInfo(1, 0, 0),
+                semver.VersionInfo(1, 1, 0),
+                semver.VersionInfo(1, 2, 0),
+            ]
+        }
+        result = get_extension_data("extensions_path")
+        self.assertEqual(result, expected_data)
 
 
 class TestFindDuplicates(unittest.TestCase):
-    def test_find_duplicates_no_duplicates(self):
+    def test_find_duplicates_with_duplicates(self):
         extension_data = {
-            'ext1': [semver.VersionInfo(1, 0, 0)],
-            'ext2': [semver.VersionInfo(2, 0, 0)],
-        }
-        self.assertEqual(find_duplicates(extension_data), {})
-
-    def test_find_duplicates_single_duplicate(self):
-        extension_data = {
-            'ext1': [semver.VersionInfo(1, 0, 0), semver.VersionInfo(1, 1, 0)],
-            'ext2': [semver.VersionInfo(2, 0, 0)],
-        }
-        expected_duplicates = {'ext1': [semver.VersionInfo(1, 0, 0), semver.VersionInfo(1, 1, 0)]}
-        self.assertEqual(find_duplicates(extension_data), expected_duplicates)
-
-    def test_find_duplicates_multiple_duplicates(self):
-        extension_data = {
-            'ext1': [semver.VersionInfo(1, 0, 0), semver.VersionInfo(1, 1, 0)],
-            'ext2': [semver.VersionInfo(2, 0, 0), semver.VersionInfo(2, 1, 0), semver.VersionInfo(2, 2, 0)],
+            "my-extension": [
+                semver.VersionInfo(1, 0, 0),
+                semver.VersionInfo(1, 1, 0),
+            ],
+            "another-extension": [semver.VersionInfo(2, 0, 0)],
         }
         expected_duplicates = {
-            'ext1': [semver.VersionInfo(1, 0, 0), semver.VersionInfo(1, 1, 0)],
-            'ext2': [semver.VersionInfo(2, 0, 0), semver.VersionInfo(2, 1, 0), semver.VersionInfo(2, 2, 0)],
+            "my-extension": [
+                semver.VersionInfo(1, 0, 0),
+                semver.VersionInfo(1, 1, 0),
+            ]
         }
-        self.assertEqual(find_duplicates(extension_data), expected_duplicates)
+        result = find_duplicates(extension_data)
+        self.assertEqual(result, expected_duplicates)
+
+    def test_find_duplicates_no_duplicates(self):
+        extension_data = {
+            "my-extension": [semver.VersionInfo(1, 0, 0)],
+            "another-extension": [semver.VersionInfo(2, 0, 0)],
+        }
+        expected_duplicates = {}
+        result = find_duplicates(extension_data)
+        self.assertEqual(result, expected_duplicates)
+
+    def test_find_duplicates_empty_data(self):
+        extension_data = {}
+        expected_duplicates = {}
+        result = find_duplicates(extension_data)
+        self.assertEqual(result, expected_duplicates)
 
 
 class TestGetLatestVersions(unittest.TestCase):
-    def test_get_latest_versions_single_duplicate(self):
-        duplicate_extensions = {'ext1': [semver.VersionInfo(1, 0, 0), semver.VersionInfo(1, 1, 0)]}
-        expected_latest = {'ext1': semver.VersionInfo(1, 1, 0)}
-        self.assertEqual(get_latest_versions(duplicate_extensions), expected_latest)
-
-    def test_get_latest_versions_multiple_duplicates(self):
+    def test_get_latest_versions_with_duplicates(self):
         duplicate_extensions = {
-            'ext1': [semver.VersionInfo(1, 0, 0), semver.VersionInfo(1, 1, 0)],
-            'ext2': [semver.VersionInfo(2, 0, 0), semver.VersionInfo(2, 1, 0), semver.VersionInfo(2, 2, 0)],
+            "my-extension": [
+                semver.VersionInfo(1, 0, 0),
+                semver.VersionInfo(1, 1, 0),
+            ],
+            "another-extension": [
+                semver.VersionInfo(2, 0, 0),
+                semver.VersionInfo(1, 9, 0),
+            ],
         }
         expected_latest = {
-            'ext1': semver.VersionInfo(1, 1, 0),
-            'ext2': semver.VersionInfo(2, 2, 0),
+            "my-extension": semver.VersionInfo(1, 1, 0),
+            "another-extension": semver.VersionInfo(2, 0, 0),
         }
-        self.assertEqual(get_latest_versions(duplicate_extensions), expected_latest)
+        result = get_latest_versions(duplicate_extensions)
+        self.assertEqual(result, expected_latest)
 
     def test_get_latest_versions_no_duplicates(self):
         duplicate_extensions = {}
-        self.assertEqual(get_latest_versions(duplicate_extensions), {})
+        expected_latest = {}
+        result = get_latest_versions(duplicate_extensions)
+        self.assertEqual(result, expected_latest)
 
 
 class TestShowReport(unittest.TestCase):
-    @patch('builtins.print')
+    @patch("builtins.print")
+    def test_show_report_with_duplicates(self, mock_print):
+        duplicate_extensions = {
+            "my-extension": [
+                semver.VersionInfo(1, 0, 0),
+                semver.VersionInfo(1, 1, 0),
+            ]
+        }
+        latest_versions = {"my-extension": semver.VersionInfo(1, 1, 0)}
+        show_report(duplicate_extensions, latest_versions)
+        mock_print.assert_called_with(
+            "* my-extension (Latest: 1.1.0, Old: 1.0.0)"
+        )
+
+    @patch("builtins.print")
     def test_show_report_no_duplicates(self, mock_print):
         duplicate_extensions = {}
         latest_versions = {}
         show_report(duplicate_extensions, latest_versions)
-        mock_print.assert_called_once_with("No duplicate extensions found.")
+        mock_print.assert_called_with("No duplicate extensions found.")
 
-    @patch('builtins.print')
-    def test_show_report_with_duplicates(self, mock_print):
-        duplicate_extensions = {'ext1': [semver.VersionInfo(1, 0, 0), semver.VersionInfo(1, 1, 0)]}
-        latest_versions = {'ext1': semver.VersionInfo(1, 1, 0)}
+    @patch("builtins.print")
+    def test_show_report_latest_only(self, mock_print):
+        duplicate_extensions = {"my-extension": [semver.VersionInfo(1, 1, 0)]}
+        latest_versions = {"my-extension": semver.VersionInfo(1, 1, 0)}
         show_report(duplicate_extensions, latest_versions)
-        self.assertEqual(mock_print.call_count, 2)
-        mock_print.assert_any_call("Duplicate extensions Report:")
-        mock_print.assert_any_call("* ext1 (Latest: 1.1.0, Old: 1.0.0)")
+        mock_print.assert_called_with("* my-extension (Latest version: 1.1.0 - no older duplicates)")
 
 
 class TestRemoveDuplicates(unittest.TestCase):
-    @patch('os.makedirs')
-    @patch('shutil.move')
-    @patch('builtins.input')
-    def test_remove_duplicates_auto_approve(self, mock_input, mock_move, mock_makedirs):
+    @patch("os.makedirs")
+    @patch("shutil.move")
+    @patch("builtins.input")
+    def test_remove_duplicates_auto_approve(
+        self, mock_input, mock_move, mock_makedirs
+    ):
         mock_input.return_value = "yes"
-        duplicate_extensions = {'ext1': [semver.VersionInfo(1, 0, 0), semver.VersionInfo(1, 1, 0)]}
-        latest_versions = {'ext1': semver.VersionInfo(1, 1, 0)}
-        extensions_path = '/path/to/extensions'
-        args = unittest.mock.MagicMock()
-        args.auto_approve = True
-        remove_duplicates(duplicate_extensions, latest_versions, extensions_path, args)
-        mock_makedirs.assert_called_once_with('old_versions', exist_ok=True)
-        mock_move.assert_called_once_with(os.path.join('/path/to/extensions', 'ext1-1.0.0'), os.path.join('old_versions', 'ext1-1.0.0'))
+        duplicate_extensions = {
+            "my-extension": [
+                semver.VersionInfo(1, 0, 0),
+                semver.VersionInfo(1, 1, 0),
+            ]
+        }
+        latest_versions = {"my-extension": semver.VersionInfo(1, 1, 0)}
+        extensions_path = "extensions_path"
+        args = argparse.Namespace(auto_approve=True)
+        remove_duplicates(
+            duplicate_extensions, latest_versions, extensions_path, args
+        )
+        mock_makedirs.assert_called_once_with("old_versions", exist_ok=True)
+        mock_move.assert_called_once_with(
+            "extensions_path\\my-extension-1.0.0", "old_versions\\my-extension-1.0.0"
+        )
 
-    @patch('os.makedirs')
-    @patch('shutil.move')
-    @patch('builtins.input')
-    def test_remove_duplicates_manual_approve_yes(self, mock_input, mock_move, mock_makedirs):
+    @patch("os.makedirs")
+    @patch("shutil.move")
+    @patch("builtins.input")
+    def test_remove_duplicates_user_approve(
+        self, mock_input, mock_move, mock_makedirs
+    ):
         mock_input.return_value = "yes"
-        duplicate_extensions = {'ext1': [semver.VersionInfo(1, 0, 0), semver.VersionInfo(1, 1, 0)]}
-        latest_versions = {'ext1': semver.VersionInfo(1, 1, 0)}
-        extensions_path = '/path/to/extensions'
-        args = unittest.mock.MagicMock()
-        args.auto_approve = False
-        remove_duplicates(duplicate_extensions, latest_versions, extensions_path, args)
-        mock_makedirs.assert_called_once_with('old_versions', exist_ok=True)
-        mock_move.assert_called_once_with(os.path.join('/path/to/extensions', 'ext1-1.0.0'), os.path.join('old_versions', 'ext1-1.0.0'))
+        duplicate_extensions = {
+            "my-extension": [
+                semver.VersionInfo(1, 0, 0),
+                semver.VersionInfo(1, 1, 0),
+            ]
+        }
+        latest_versions = {"my-extension": semver.VersionInfo(1, 1, 0)}
+        extensions_path = "extensions_path"
+        args = argparse.Namespace(auto_approve=False)
+        remove_duplicates(
+            duplicate_extensions, latest_versions, extensions_path, args
+        )
+        mock_makedirs.assert_called_once_with("old_versions", exist_ok=True)
+        mock_move.assert_called_once_with(
+            "extensions_path\\my-extension-1.0.0", "old_versions\\my-extension-1.0.0"
+        )
 
-    @patch('os.makedirs')
-    @patch('shutil.move')
-    @patch('builtins.input')
-    def test_remove_duplicates_manual_approve_no(self, mock_input, mock_move, mock_makedirs):
+    @patch("os.makedirs")
+    @patch("shutil.move")
+    @patch("builtins.input")
+    def test_remove_duplicates_user_decline(
+        self, mock_input, mock_move, mock_makedirs
+    ):
         mock_input.return_value = "no"
-        duplicate_extensions = {'ext1': [semver.VersionInfo(1, 0, 0), semver.VersionInfo(1, 1, 0)]}
-        latest_versions = {'ext1': semver.VersionInfo(1, 1, 0)}
-        extensions_path = '/path/to/extensions'
-        args = unittest.mock.MagicMock()
-        args.auto_approve = False
-        remove_duplicates(duplicate_extensions, latest_versions, extensions_path, args)
+        duplicate_extensions = {
+            "my-extension": [
+                semver.VersionInfo(1, 0, 0),
+                semver.VersionInfo(1, 1, 0),
+            ]
+        }
+        latest_versions = {"my-extension": semver.VersionInfo(1, 1, 0)}
+        extensions_path = "extensions_path"
+        args = argparse.Namespace(auto_approve=False)
+        remove_duplicates(
+            duplicate_extensions, latest_versions, extensions_path, args
+        )
         mock_makedirs.assert_not_called()
         mock_move.assert_not_called()
 
-    @patch('os.makedirs')
-    @patch('shutil.move')
-    @patch('builtins.input')
-    def test_remove_duplicates_no_duplicates(self, mock_input, mock_move, mock_makedirs):
-        mock_input.return_value = "yes"
+    @patch("os.makedirs")
+    @patch("shutil.move")
+    @patch("builtins.input")
+    def test_remove_duplicates_no_duplicates(
+        self, mock_input, mock_move, mock_makedirs
+    ):
         duplicate_extensions = {}
         latest_versions = {}
-        extensions_path = '/path/to/extensions'
-        args = unittest.mock.MagicMock()
-        args.auto_approve = True
-        remove_duplicates(duplicate_extensions, latest_versions, extensions_path, args)
+        extensions_path = "extensions_path"
+        args = argparse.Namespace(auto_approve=False)
+        remove_duplicates(
+            duplicate_extensions, latest_versions, extensions_path, args
+        )
         mock_makedirs.assert_not_called()
         mock_move.assert_not_called()
 
+    @patch("os.makedirs")
+    @patch("shutil.move")
+    @patch("builtins.input")
+    def test_remove_duplicates_move_error(
+        self, mock_input, mock_move, mock_makedirs
+    ):
+        mock_input.return_value = "yes"
+        mock_move.side_effect = Exception("Move failed")
+        duplicate_extensions = {
+            "my-extension": [
+                semver.VersionInfo(1, 0, 0),
+                semver.VersionInfo(1, 1, 0),
+            ]
+        }
+        latest_versions = {"my-extension": semver.VersionInfo(1, 1, 0)}
+        extensions_path = "extensions_path"
+        args = argparse.Namespace(auto_approve=True)
+        remove_duplicates(
+            duplicate_extensions, latest_versions, extensions_path, args
+        )
+        mock_makedirs.assert_called_once_with("old_versions", exist_ok=True)
+        mock_move.assert_called_once_with(
+            "extensions_path\\my-extension-1.0.0", "old_versions\\my-extension-1.0.0"
+        )
 
-if __name__ == '__main__':
+
+class TestMain(unittest.TestCase):
+    @patch("main.get_extension_data")
+    @patch("main.find_duplicates")
+    @patch("main.get_latest_versions")
+    @patch("main.show_report")
+    @patch("main.remove_duplicates")
+    @patch("argparse.ArgumentParser.parse_args")
+    def test_main_function_calls(
+        self,
+        mock_parse_args,
+        mock_remove_duplicates,
+        mock_show_report,
+        mock_get_latest_versions,
+        mock_find_duplicates,
+        mock_get_extension_data,
+    ):
+        mock_parse_args.return_value = argparse.Namespace(
+            extensions_path="extensions_path", auto_approve=True
+        )
+        main()
+        mock_get_extension_data.assert_called_once_with("extensions_path")
+        mock_find_duplicates.assert_called_once()
+        mock_get_latest_versions.assert_called_once()
+        mock_show_report.assert_called_once()
+        mock_remove_duplicates.assert_called_once()
+
+    @patch("main.get_extension_data")
+    @patch("main.find_duplicates")
+    @patch("main.get_latest_versions")
+    @patch("main.show_report")
+    @patch("main.remove_duplicates")
+    @patch("argparse.ArgumentParser.parse_args")
+    def test_main_function_calls_with_auto_approve_false(
+        self,
+        mock_parse_args,
+        mock_remove_duplicates,
+        mock_show_report,
+        mock_get_latest_versions,
+        mock_find_duplicates,
+        mock_get_extension_data,
+    ):
+        mock_parse_args.return_value = argparse.Namespace(
+            extensions_path="extensions_path", auto_approve=False
+        )
+        main()
+        mock_get_extension_data.assert_called_once_with("extensions_path")
+        mock_find_duplicates.assert_called_once()
+        mock_get_latest_versions.assert_called_once()
+        mock_show_report.assert_called_once()
+        mock_remove_duplicates.assert_called_once()
+
+
+if __name__ == "__main__":
     unittest.main()
